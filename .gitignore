@@ -2,3 +2,4 @@
 .idea
 *.posf
 *.exe
+.venv

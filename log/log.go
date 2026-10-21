@@ -1,7 +1,7 @@
 package newlog
 
 import (
-	newerror "demo/pkg/error"
+	newerror "github.com/Lqingzhe/go-common-tool/error"
 	"log"
 	"time"
 
