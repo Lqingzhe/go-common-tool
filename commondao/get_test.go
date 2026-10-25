@@ -33,7 +33,7 @@ func (d *TestDataModel) SetInfo(info *TestDataModel) {
 	d.Info = info
 }
 
-func (d *TestDataModel) WhetherExist() bool {
+func (d *TestDataModel) WhetherExist(_ ...*TestDataModel) bool {
 	if d.Info == nil {
 		return false
 	}
@@ -57,8 +57,8 @@ type MockOperateWithDBAndCache[DM any, DC any] struct {
 	// info 接口
 	GetKeyFunc        func() string
 	GetEmptyValueFunc func() *DM
-	SetInfoFunc       func(*DM)
-	WhetherExistFunc  func() bool
+	SetInfoFunc       func(...*DM)
+	WhetherExistFunc  func(...*DM) bool
 
 	// cacheOperation 接口
 	GetCacheFunc    func(context.Context, DBContextInterface[DC]) (*DM, bool, error)
@@ -71,7 +71,7 @@ type MockOperateWithDBAndCache[DM any, DC any] struct {
 	DeleteDBFunc func(context.Context, DBContextInterface[DC]) error
 	UpdateDBFunc func(context.Context, DBContextInterface[DC]) (bool, error)
 	//储存数据
-	info *DM
+	info []*DM
 }
 
 // 实现 info 接口
@@ -90,13 +90,13 @@ func (m *MockOperateWithDBAndCache[DM, DC]) GetEmptyValue() *DM {
 	return &zero
 }
 
-func (m *MockOperateWithDBAndCache[DM, DC]) SetInfo(info *DM) {
+func (m *MockOperateWithDBAndCache[DM, DC]) SetInfo(info ...*DM) {
 	if m.SetInfoFunc != nil {
-		m.SetInfoFunc(info)
+		m.SetInfoFunc(info[0])
 	}
 }
 
-func (m *MockOperateWithDBAndCache[DM, DC]) WhetherExist() bool {
+func (m *MockOperateWithDBAndCache[DM, DC]) WhetherExist(_ ...*DM) bool {
 	if m.WhetherExistFunc != nil {
 		return m.WhetherExistFunc()
 	}
@@ -172,10 +172,10 @@ func newMockCacheHit(key string) *MockOperateWithDBAndCache[TestDataModel, TestD
 		}
 		return data, true, nil
 	}
-	mock.SetInfoFunc = func(info *TestDataModel) {
+	mock.SetInfoFunc = func(info ...*TestDataModel) {
 		mock.info = info
 	}
-	mock.WhetherExistFunc = func() bool { return true }
+	mock.WhetherExistFunc = func(...*TestDataModel) bool { return true }
 
 	return mock
 }
@@ -199,10 +199,10 @@ func newMockCacheMissDBHit(key string) *MockOperateWithDBAndCache[TestDataModel,
 	mock.SetCacheFunc = func(ctx context.Context, db DBContextInterface[TestDBContext]) error {
 		return nil
 	}
-	mock.SetInfoFunc = func(info *TestDataModel) {
+	mock.SetInfoFunc = func(info ...*TestDataModel) {
 		mock.info = info
 	}
-	mock.WhetherExistFunc = func() bool { return true }
+	mock.WhetherExistFunc = func(...*TestDataModel) bool { return true }
 
 	return mock
 }
@@ -221,10 +221,10 @@ func newMockCacheMissDBMiss(key string) *MockOperateWithDBAndCache[TestDataModel
 	mock.GetEmptyValueFunc = func() *TestDataModel {
 		return &TestDataModel{Key: key, Val: nil, Info: &TestDataModel{}}
 	}
-	mock.SetInfoFunc = func(info *TestDataModel) {
+	mock.SetInfoFunc = func(info ...*TestDataModel) {
 		mock.info = info
 	}
-	mock.WhetherExistFunc = func() bool { return false }
+	mock.WhetherExistFunc = func(...*TestDataModel) bool { return false }
 
 	return mock
 }
@@ -245,10 +245,10 @@ func newMockCacheError(key string) *MockOperateWithDBAndCache[TestDataModel, Tes
 		}
 		return data, true, nil
 	}
-	mock.SetInfoFunc = func(info *TestDataModel) {
+	mock.SetInfoFunc = func(info ...*TestDataModel) {
 		mock.info = info
 	}
-	mock.WhetherExistFunc = func() bool { return true }
+	mock.WhetherExistFunc = func(...*TestDataModel) bool { return true }
 
 	return mock
 }
@@ -289,10 +289,10 @@ func newMockSlowDB(key string, delay time.Duration) *MockOperateWithDBAndCache[T
 			return nil, false, ctx.Err()
 		}
 	}
-	mock.SetInfoFunc = func(info *TestDataModel) {
+	mock.SetInfoFunc = func(info ...*TestDataModel) {
 		mock.info = info
 	}
-	mock.WhetherExistFunc = func() bool { return true }
+	mock.WhetherExistFunc = func(...*TestDataModel) bool { return true }
 
 	return mock
 }
@@ -332,7 +332,7 @@ func newMockSetCacheError(key string) *MockOperateWithDBAndCache[TestDataModel, 
 	mock.SetCacheFunc = func(ctx context.Context, db DBContextInterface[TestDBContext]) error {
 		return errors.New("set cache failed")
 	}
-	mock.SetInfoFunc = func(info *TestDataModel) {
+	mock.SetInfoFunc = func(info ...*TestDataModel) {
 		mock.info = info
 	}
 
@@ -352,10 +352,10 @@ func newMockEmptyCacheHit(key string) *MockOperateWithDBAndCache[TestDataModel, 
 		}
 		return data, true, nil
 	}
-	mock.SetInfoFunc = func(info *TestDataModel) {
+	mock.SetInfoFunc = func(info ...*TestDataModel) {
 		mock.info = info
 	}
-	mock.WhetherExistFunc = func() bool { return false }
+	mock.WhetherExistFunc = func(...*TestDataModel) bool { return false }
 
 	return mock
 }
@@ -518,7 +518,7 @@ func TestGetWithCache_ConcurrentRequests_CacheMiss(t *testing.T) {
 						mu1.Lock()
 						halfSuccessCount++
 						mu1.Unlock()
-						if mockInfo.info != nil && mockInfo.info.Val == "db_value" {
+						if mockInfo.info != nil && mockInfo.info[0].Val == "db_value" {
 							mu2.Lock()
 							successCount++
 							mu2.Unlock()
@@ -801,8 +801,8 @@ func TestGetWithCache_ExtremeConcurrentPenetration(t *testing.T) {
 	customMock.SetCacheFunc = func(ctx context.Context, db DBContextInterface[TestDBContext]) error {
 		return nil
 	}
-	customMock.SetInfoFunc = func(info *TestDataModel) {}
-	customMock.WhetherExistFunc = func() bool { return true }
+	customMock.SetInfoFunc = func(info ...*TestDataModel) {}
+	customMock.WhetherExistFunc = func(...*TestDataModel) bool { return true }
 
 	ch := make(chan struct{})
 	var wg sync.WaitGroup
@@ -862,10 +862,10 @@ func TestWithCache_UpdateData(t *testing.T) {
 		wg1.Go(func() {
 			_, _ = GetWithCacheWithL1(ctx, cache, dbCtx, mockInfo)
 			if mockInfo.info != nil {
-				if mockInfo.info.Val.(string) == "db_value" {
+				if mockInfo.info[0].Val.(string) == "db_value" {
 					oldValueCount.Add(1)
 				}
-				if mockInfo.info.Val.(string) == "db_value2" {
+				if mockInfo.info[0].Val.(string) == "db_value2" {
 					newValueCount.Add(1)
 				}
 			}
@@ -877,10 +877,10 @@ func TestWithCache_UpdateData(t *testing.T) {
 		wg2.Go(func() {
 			_, _ = GetWithCacheWithL1(ctx, cache, dbCtx, mockInfo)
 			if mockInfo != nil {
-				if mockInfo.info.Val.(string) == "db_value" {
+				if mockInfo.info[0].Val.(string) == "db_value" {
 					oldValueCount.Add(1)
 				}
-				if mockInfo.info.Val.(string) == "db_value2" {
+				if mockInfo.info[0].Val.(string) == "db_value2" {
 					newValueCount.Add(1)
 				}
 			}
@@ -921,8 +921,8 @@ func TestHighConcurrency_GetWithCache_L2CacheHit(t *testing.T) {
 		}
 		return data, true, nil
 	}
-	mockInfo.SetInfoFunc = func(info *TestDataModel) {}
-	mockInfo.WhetherExistFunc = func() bool { return true }
+	mockInfo.SetInfoFunc = func(info ...*TestDataModel) {}
+	mockInfo.WhetherExistFunc = func(...*TestDataModel) bool { return true }
 
 	for i := 0; i < goroutineCount; i++ {
 		wg.Add(1)
@@ -998,8 +998,8 @@ func TestHighConcurrency_GetWithCache_L2CacheMiss_DBHit(t *testing.T) {
 		mock.SetCacheFunc = func(ctx context.Context, db DBContextInterface[TestDBContext]) error {
 			return nil
 		}
-		mock.SetInfoFunc = func(info *TestDataModel) {}
-		mock.WhetherExistFunc = func() bool { return true }
+		mock.SetInfoFunc = func(info ...*TestDataModel) {}
+		mock.WhetherExistFunc = func(...*TestDataModel) bool { return true }
 		return mock
 	}
 
@@ -1066,8 +1066,8 @@ func TestHighConcurrency_GetWithCache_L2CacheMiss_DBMiss(t *testing.T) {
 		mock.SetCacheFunc = func(ctx context.Context, db DBContextInterface[TestDBContext]) error {
 			return nil
 		}
-		mock.SetInfoFunc = func(info *TestDataModel) {}
-		mock.WhetherExistFunc = func() bool { return false }
+		mock.SetInfoFunc = func(info ...*TestDataModel) {}
+		mock.WhetherExistFunc = func(...*TestDataModel) bool { return false }
 		return mock
 	}
 
@@ -1135,8 +1135,8 @@ func TestHighConcurrency_GetWithCache_MultipleKeys(t *testing.T) {
 		mock.SetCacheFunc = func(ctx context.Context, db DBContextInterface[TestDBContext]) error {
 			return nil
 		}
-		mock.SetInfoFunc = func(info *TestDataModel) {}
-		mock.WhetherExistFunc = func() bool { return true }
+		mock.SetInfoFunc = func(info ...*TestDataModel) {}
+		mock.WhetherExistFunc = func(...*TestDataModel) bool { return true }
 		return mock
 	}
 
@@ -1193,8 +1193,8 @@ func BenchmarkGetWithCache_L2CacheHit(b *testing.B) {
 		}
 		return data, true, nil
 	}
-	mockInfo.SetInfoFunc = func(info *TestDataModel) {}
-	mockInfo.WhetherExistFunc = func() bool { return true }
+	mockInfo.SetInfoFunc = func(info ...*TestDataModel) {}
+	mockInfo.WhetherExistFunc = func(...*TestDataModel) bool { return true }
 
 	// 预热
 	GetWithCacheWithL1[TestDataModel, TestDBContext](
@@ -1244,8 +1244,8 @@ func BenchmarkGetWithCache_L2CacheMiss_DBHit(b *testing.B) {
 	mockInfo.SetCacheFunc = func(ctx context.Context, db DBContextInterface[TestDBContext]) error {
 		return nil
 	}
-	mockInfo.SetInfoFunc = func(info *TestDataModel) {}
-	mockInfo.WhetherExistFunc = func() bool { return true }
+	mockInfo.SetInfoFunc = func(info ...*TestDataModel) {}
+	mockInfo.WhetherExistFunc = func(...*TestDataModel) bool { return true }
 
 	b.ResetTimer()
 	b.RunParallel(func(pb *testing.PB) {
