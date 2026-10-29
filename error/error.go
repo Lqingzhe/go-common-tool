@@ -34,7 +34,11 @@ func (e *Error) MarshalError() error {
 	if e == nil {
 		return nil
 	}
-	return fmt.Errorf(`{"http_code":%d,"http_message":"%s","status_code":%d,"log_level":%d,"log_message":"%s","is_need_interrupt":%t}`, e.HttpCode, e.HttpMessage, e.StatusCode, e.LogLevel, e.LogMessage, e.IsNeedInterrupt)
+	b, err2 := sonic.Marshal(e)
+	if err2 != nil {
+		return fmt.Errorf(`{"http_code":%d,"http_message":"%s","status_code":%d,"log_level":%d,"log_message":"%s","is_need_interrupt":%t}`, http.StatusInternalServerError, "Internal Error: "+e.Error(), CodeInternalError, LevelError, "Marshal Error Failed", true)
+	}
+	return errors.New(string(b))
 }
 func UnMarshalError(err error) error {
 	if err == nil {

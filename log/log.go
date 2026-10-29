@@ -1,9 +1,10 @@
 package newlog
 
 import (
-	newerror "github.com/Lqingzhe/go-common-tool/error"
 	"log"
 	"time"
+
+	newerror "github.com/Lqingzhe/go-common-tool/error"
 
 	"go.uber.org/zap"
 	"go.uber.org/zap/zapcore"
